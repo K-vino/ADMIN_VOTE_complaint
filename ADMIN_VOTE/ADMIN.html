@@ -1,0 +1,1158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Voting System Complaint Portal - Admin Panel</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.22.2/firebase-app-compat.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.22.2/firebase-firestore-compat.js"></script>
+    <style>
+        :root {
+            --primary-color: #1a73e8;
+            --secondary-color: #f8f9fa;
+            --success-color: #34a853;
+            --danger-color: #ea4335;
+            --warning-color: #fbbc05;
+            --dark-text: #202124;
+            --light-text: #5f6368;
+            --border-color: #dadce0;
+            --hover-color: #e8f0fe;
+            --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.1);
+            --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Roboto', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background-color: var(--secondary-color);
+            color: var(--dark-text);
+            line-height: 1.6;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 24px;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 32px;
+            padding: 24px 0;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        header h1 {
+            color: var(--primary-color);
+            font-size: 2.2rem;
+            margin-bottom: 12px;
+        }
+
+        .filter-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+            background: white;
+            padding: 16px;
+            border-radius: 8px;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .filter-group {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        select, textarea {
+            padding: 8px 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            font-size: 16px;
+            transition: all 0.3s ease;
+        }
+
+        select:focus, textarea:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(26, 115, 232, 0.1);
+        }
+
+        textarea {
+            width: 100%;
+            min-height: 100px;
+            resize: vertical;
+        }
+
+        .complaints-table {
+            width: 100%;
+            background: white;
+            border-radius: 8px;
+            box-shadow: var(--shadow-md);
+            overflow: hidden;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th, td {
+            padding: 12px 16px;
+            text-align: left;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        th {
+            background-color: var(--primary-color);
+            color: white;
+            font-weight: 500;
+            cursor: pointer;
+        }
+
+        th:hover {
+            background-color: #0d66d0;
+        }
+
+        tr:hover {
+            background-color: var(--hover-color);
+            cursor: pointer;
+        }
+
+        .status {
+            padding: 6px 12px;
+            border-radius: 12px;
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .status-received { background-color: #e8f0fe; color: var(--primary-color); }
+        .status-review { background-color: #fff3cd; color: var(--warning-color); }
+        .status-investigating { background-color: #d4edda; color: var(--success-color); }
+        .status-resolved { background-color: #d4edda; color: var(--success-color); }
+        .status-canceled { background-color: #f8d7da; color: var(--danger-color); }
+
+        .action-btn {
+            padding: 6px 12px;
+            border-radius: 4px;
+            border: none;
+            color: white;
+            cursor: pointer;
+            margin-right: 8px;
+            font-size: 14px;
+        }
+
+        .update-btn { background-color: var(--primary-color); }
+        .update-btn:hover { background-color: #0d66d0; }
+
+        .alert {
+            padding: 16px;
+            margin-bottom: 24px;
+            border-radius: 6px;
+            display: none;
+            position: relative;
+            animation: slideIn 0.3s ease;
+        }
+
+        @keyframes slideIn {
+            from { transform: translateY(-10px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+
+        .alert-danger {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .alert-success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .spinner {
+            display: none;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(0, 0, 0, 0.3);
+            border-radius: 50%;
+            border-top-color: var(--primary-color);
+            animation: spin 1s ease-in-out infinite;
+            margin: 0 auto;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .modal-content {
+            background: white;
+            padding: 24px;
+            border-radius: 8px;
+            max-width: 600px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+            box-shadow: var(--shadow-md);
+            position: relative;
+        }
+
+        .close-btn {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            background: var(--danger-color);
+            color: white;
+            border: none;
+            border-radius: 4px;
+            padding: 6px 12px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .close-btn:hover {
+            background: #c5221f;
+        }
+
+        .detail-row {
+            margin-bottom: 12px;
+        }
+
+        .detail-label {
+            font-weight: 500;
+            color: var(--primary-color);
+            margin-bottom: 4px;
+        }
+
+        .detail-value {
+            color: var(--dark-text);
+        }
+
+        button {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            font-size: 16px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        button:hover:not(:disabled) {
+            background-color: #0d66d0;
+            transform: translateY(-1px);
+        }
+
+        button:disabled {
+            background-color: var(--light-text);
+            cursor: not-allowed;
+            opacity: 0.7;
+        }
+
+        .modal-actions {
+            display: flex;
+            gap: 12px;
+            margin-top: 16px;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 16px;
+            }
+
+            .filter-container {
+                flex-direction: column;
+                gap: 12px;
+            }
+
+            table {
+                font-size: 14px;
+            }
+
+            th, td {
+                padding: 8px;
+            }
+
+            .modal-content {
+                width: 95%;
+                padding: 16px;
+            }
+
+            .action-btn {
+                padding: 4px 8px;
+                font-size: 12px;
+            }
+        }
+
+        /* Dashboard Styles */
+        .dashboard-container {
+            background: white;
+            padding: 24px;
+            border-radius: 8px;
+            box-shadow: var(--shadow-md);
+            margin-bottom: 24px;
+        }
+
+        .dashboard-container h2 {
+            color: var(--primary-color);
+            margin-bottom: 24px;
+            font-size: 1.5rem;
+        }
+
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .dashboard-card {
+            background: var(--secondary-color);
+            padding: 16px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .dashboard-card h3 {
+            color: var(--light-text);
+            font-size: 1rem;
+            margin-bottom: 8px;
+        }
+
+        .metric-value {
+            font-size: 2rem;
+            font-weight: bold;
+            color: var(--primary-color);
+        }
+
+        .dashboard-charts {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 24px;
+        }
+
+        .chart-container {
+            background: white;
+            padding: 16px;
+            border-radius: 8px;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .chart-container h3 {
+            color: var(--dark-text);
+            font-size: 1rem;
+            margin-bottom: 16px;
+            text-align: center;
+        }
+
+        @media (max-width: 768px) {
+            .dashboard-grid {
+                grid-template-columns: 1fr 1fr;
+            }
+            
+            .dashboard-charts {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Admin Panel - Voting System Complaints</h1>
+            <p>Manage and review user-submitted complaints</p>
+        </header>
+
+        <div class="alert alert-danger" id="errorAlert"></div>
+        <div class="alert alert-success" id="successAlert"></div>
+
+        <!-- Dashboard Section -->
+        <div class="dashboard-container">
+            <h2>Complaint Analytics Dashboard</h2>
+            <div class="dashboard-grid">
+                <!-- Key Metrics -->
+                <div class="dashboard-card">
+                    <h3>Total Complaints</h3>
+                    <div class="metric-value" id="totalComplaints">0</div>
+                </div>
+                <div class="dashboard-card">
+                    <h3>High Priority</h3>
+                    <div class="metric-value" id="highPriority">0</div>
+                </div>
+                <div class="dashboard-card">
+                    <h3>Resolution Rate</h3>
+                    <div class="metric-value" id="resolutionRate">0%</div>
+                </div>
+                <div class="dashboard-card">
+                    <h3>Avg. Resolution Time</h3>
+                    <div class="metric-value" id="avgResolutionTime">0 days</div>
+                </div>
+            </div>
+
+            <!-- Charts -->
+            <div class="dashboard-charts">
+                <div class="chart-container">
+                    <h3>Complaints by Status</h3>
+                    <canvas id="statusChart"></canvas>
+                </div>
+                <div class="chart-container">
+                    <h3>Complaints by Type</h3>
+                    <canvas id="typeChart"></canvas>
+                </div>
+                <div class="chart-container">
+                    <h3>Complaints Trend</h3>
+                    <canvas id="trendChart"></canvas>
+                </div>
+                <div class="chart-container">
+                    <h3>Priority Distribution</h3>
+                    <canvas id="priorityChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <div class="filter-container">
+            <div class="filter-group">
+                <label for="statusFilter">Filter by Status:</label>
+                <select id="statusFilter">
+                    <option value="">All</option>
+                    <option value="Received">Received</option>
+                    <option value="Under Review">Under Review</option>
+                    <option value="Investigating">Investigating</option>
+                    <option value="Resolved">Resolved</option>
+                    <option value="Canceled">Canceled</option>
+                </select>
+            </div>
+            <button id="refreshBtn">Refresh</button>
+        </div>
+
+        <div class="complaints-table">
+            <table id="complaintsTable">
+                <thead>
+                    <tr>
+                        <th onclick="sortTable(0)">Complaint ID</th>
+                        <th onclick="sortTable(1)">Full Name</th>
+                        <th onclick="sortTable(2)">Voter ID/Email</th>
+                        <th onclick="sortTable(3)">Complaint Type</th>
+                        <th onclick="sortTable(4)">Status</th>
+                        <th onclick="sortTable(5)">Submitted On</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="complaintsBody">
+                    <tr><td colspan="7"><div class="spinner" id="tableSpinner"></div></td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="modal" id="complaintModal">
+            <div class="modal-content">
+                <button class="close-btn" onclick="closeModal()">Close</button>
+                <h2>Complaint Details</h2>
+                <div class="detail-row">
+                    <div class="detail-label">Complaint ID:</div>
+                    <div class="detail-value" id="modalComplaintId"></div>
+                </div>
+                <div class="detail-row">
+                    <div class="detail-label">Full Name:</div>
+                    <div class="detail-value" id="modalFullName"></div>
+                </div>
+                <div class="detail-row">
+                    <div class="detail-label">Voter ID/Email:</div>
+                    <div class="detail-value" id="modalVoterId"></div>
+                </div>
+                <div class="detail-row">
+                    <div class="detail-label">Complaint Type:</div>
+                    <div class="detail-value" id="modalComplaintType"></div>
+                </div>
+                <div class="detail-row">
+                    <div class="detail-label">Status:</div>
+                    <div class="detail-value" id="modalStatus"></div>
+                </div>
+                <div class="detail-row">
+                    <div class="detail-label">Submitted On:</div>
+                    <div class="detail-value" id="modalSubmittedAt"></div>
+                </div>
+                <div class="detail-row">
+                    <div class="detail-label">Incident Date:</div>
+                    <div class="detail-value" id="modalIncidentDate"></div>
+                </div>
+                <div class="detail-row">
+                    <div class="detail-label">Location:</div>
+                    <div class="detail-value" id="modalLocation"></div>
+                </div>
+                <div class="detail-row">
+                    <div class="detail-label">Description:</div>
+                    <div class="detail-value" id="modalDescription"></div>
+                </div>
+                <div class="detail-row">
+                    <div class="detail-label">Contact Info:</div>
+                    <div class="detail-value" id="modalContactInfo"></div>
+                </div>
+                <div class="detail-row">
+                    <div class="detail-label">Evidence:</div>
+                    <div class="detail-value" id="modalFileUrl"></div>
+                </div>
+                <div class="detail-row">
+                    <div class="detail-label">Resolution Note:</div>
+                    <div class="detail-value" id="modalResolutionNote"></div>
+                </div>
+                <div class="detail-row">
+                    <div class="detail-label">Cancellation Reason:</div>
+                    <div class="detail-value" id="modalCancellationReason"></div>
+                </div>
+                <div class="detail-row" id="actionInput">
+                    <div class="detail-label">Update Status:</div>
+                    <select id="actionStatus">
+                        <option value="">Select Status</option>
+                        <option value="Under Review">Under Review</option>
+                        <option value="Investigating">Investigating</option>
+                        <option value="Resolved">Resolved</option>
+                        <option value="Canceled">Canceled</option>
+                    </select>
+                </div>
+                <div class="detail-row" id="actionNoteInput" style="display: none;">
+                    <div class="detail-label" id="actionLabel"></div>
+                    <textarea id="actionNote" placeholder="Enter resolution note or cancellation reason"></textarea>
+                </div>
+                <div class="modal-actions" id="modalActions"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        // Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyDuKns6v5EOUDL-aZXMA2i6223aquQzo1E",
+            authDomain: "voter-card-scanner.firebaseapp.com",
+            databaseURL: "https://voter-card-scanner-default-rtdb.asia-southeast1.firebasedatabase.app",
+            projectId: "voter-card-scanner",
+            storageBucket: "voter-card-scanner.firebasestorage.app",
+            messagingSenderId: "665299220821",
+            appId: "1:665299220821:web:f8025478a24f5375c697dc"
+        };
+
+        // Initialize Firebase
+        let db;
+        try {
+            if (!firebase.apps.length) {
+                firebase.initializeApp(firebaseConfig);
+            }
+            db = firebase.firestore();
+            console.log('Firebase initialized successfully');
+        } catch (error) {
+            console.error('Firebase initialization failed:', error);
+            showError('Failed to connect to the database. Please try again later.');
+        }
+
+        // DOM Elements
+        const statusFilter = document.getElementById('statusFilter');
+        const complaintsBody = document.getElementById('complaintsBody');
+        const tableSpinner = document.getElementById('tableSpinner');
+        const errorAlert = document.getElementById('errorAlert');
+        const successAlert = document.getElementById('successAlert');
+        const complaintModal = document.getElementById('complaintModal');
+        const refreshBtn = document.getElementById('refreshBtn');
+        const actionInput = document.getElementById('actionInput');
+        const actionStatus = document.getElementById('actionStatus');
+        const actionNoteInput = document.getElementById('actionNoteInput');
+        const actionNote = document.getElementById('actionNote');
+        const actionLabel = document.getElementById('actionLabel');
+        const modalActions = document.getElementById('modalActions');
+
+        // Utility Functions
+        const showError = (message) => {
+            errorAlert.textContent = message;
+            errorAlert.style.display = 'block';
+            setTimeout(() => errorAlert.style.display = 'none', 5000);
+        };
+
+        const showSuccess = (message) => {
+            successAlert.textContent = message;
+            successAlert.style.display = 'block';
+            setTimeout(() => successAlert.style.display = 'none', 5000);
+        };
+
+        const formatDate = (date) => {
+            if (!date) return 'N/A';
+            return date.toLocaleString('en-US', {
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+                hour12: true
+            });
+        };
+
+        const getComplaintTypeText = (value) => {
+            const types = {
+                'vote-already-cast': 'Vote already cast by someone else',
+                'missing-from-list': 'Name missing from voter list',
+                'denied-voting': 'Denied voting due to incorrect ID verification',
+                'no-voting-token': 'No voting token or access link received',
+                'unable-to-login': 'Unable to log in to voting system',
+                'interface-not-working': 'Voting interface not functioning properly',
+                'submit-error': 'Could not submit vote - system error',
+                'wrong-candidate': 'Vote went to wrong candidate',
+                'no-confirmation': 'No confirmation (receipt/VVPAT) of vote',
+                'not-in-blockchain': 'Vote not in blockchain verification record',
+                'vote-tampering': 'Suspected vote tampering or manipulation',
+                'credential-misuse': 'Someone else used my credentials',
+                'multiple-votes': 'Multiple votes from one device/IP',
+                'suspicious-behavior': 'Suspicious behavior at polling booth',
+                'staff-bias': 'Polling staff biased or misbehaving',
+                'accessibility-issues': 'No facilities for elderly/disabled voters',
+                'unsafe-environment': 'Unsafe or intimidating voting environment',
+                'long-wait': 'Long waiting time or technical delays',
+                'system-slow': 'System slow or crashed during voting',
+                'website-errors': 'Website/app not loading or showing errors',
+                'verification-failed': 'Biometric or OTP verification failed',
+                'no-support': 'No help or support available',
+                'no-response': 'No response to earlier complaint',
+                'record-correction': 'Need correction in voting record',
+                'clarification': 'Need clarification on voting guidelines',
+                'other': 'Other issue'
+            };
+            return types[value] || value;
+        };
+
+        let complaintsData = [];
+        let sortColumn = 0;
+        let sortAsc = true;
+
+        // Valid Status Transitions
+        const validTransitions = {
+            'Received': ['Under Review'],
+            'Under Review': ['Investigating'],
+            'Investigating': ['Resolved', 'Canceled'],
+            'Resolved': [],
+            'Canceled': []
+        };
+
+        // Dashboard Analytics Functions
+        const updateDashboard = (complaints) => {
+            // Update Key Metrics
+            document.getElementById('totalComplaints').textContent = complaints.length;
+            
+            const highPriority = complaints.filter(c => c.aiAnalysis?.priority === 'High').length;
+            document.getElementById('highPriority').textContent = highPriority;
+            
+            const resolved = complaints.filter(c => c.status === 'Resolved').length;
+            const resolutionRate = complaints.length ? Math.round((resolved / complaints.length) * 100) : 0;
+            document.getElementById('resolutionRate').textContent = `${resolutionRate}%`;
+            
+            // Calculate average resolution time
+            const resolvedComplaints = complaints.filter(c => c.status === 'Resolved' && c.submittedAt && c.resolveDate);
+            const totalDays = resolvedComplaints.reduce((sum, c) => {
+                const submitDate = c.submittedAt.toDate();
+                const resolveDate = c.resolveDate.toDate();
+                return sum + Math.ceil((resolveDate - submitDate) / (1000 * 60 * 60 * 24));
+            }, 0);
+            const avgDays = resolvedComplaints.length ? Math.round(totalDays / resolvedComplaints.length) : 0;
+            document.getElementById('avgResolutionTime').textContent = `${avgDays} days`;
+
+            // Status Distribution Chart
+            const statusCounts = {};
+            complaints.forEach(c => {
+                const status = c.status || 'Received';
+                statusCounts[status] = (statusCounts[status] || 0) + 1;
+            });
+            
+            // Destroy existing charts if they exist
+            if (window.statusChart) window.statusChart.destroy();
+            if (window.typeChart) window.typeChart.destroy();
+            if (window.trendChart) window.trendChart.destroy();
+            if (window.priorityChart) window.priorityChart.destroy();
+
+            window.statusChart = new Chart(document.getElementById('statusChart'), {
+                type: 'doughnut',
+                data: {
+                    labels: Object.keys(statusCounts),
+                    datasets: [{
+                        data: Object.values(statusCounts),
+                        backgroundColor: [
+                            '#1a73e8', '#34a853', '#fbbc05', '#ea4335', '#4285f4'
+                        ]
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            position: 'bottom'
+                        }
+                    }
+                }
+            });
+
+            // Complaint Types Chart
+            const typeCounts = {};
+            complaints.forEach(c => {
+                const type = c.complaintType || 'other';
+                typeCounts[type] = (typeCounts[type] || 0) + 1;
+            });
+            
+            window.typeChart = new Chart(document.getElementById('typeChart'), {
+                type: 'bar',
+                data: {
+                    labels: Object.keys(typeCounts).map(getComplaintTypeText),
+                    datasets: [{
+                        label: 'Number of Complaints',
+                        data: Object.values(typeCounts),
+                        backgroundColor: '#1a73e8'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+
+            // Trend Chart (Last 7 days)
+            const last7Days = Array.from({length: 7}, (_, i) => {
+                const d = new Date();
+                d.setDate(d.getDate() - i);
+                return d.toISOString().split('T')[0];
+            }).reverse();
+
+            const dailyCounts = {};
+            last7Days.forEach(date => dailyCounts[date] = 0);
+            complaints.forEach(c => {
+                if (c.submittedAt) {
+                    const date = c.submittedAt.toDate().toISOString().split('T')[0];
+                    if (last7Days.includes(date)) {
+                        dailyCounts[date]++;
+                    }
+                }
+            });
+
+            window.trendChart = new Chart(document.getElementById('trendChart'), {
+                type: 'line',
+                data: {
+                    labels: last7Days.map(date => new Date(date).toLocaleDateString()),
+                    datasets: [{
+                        label: 'Complaints',
+                        data: Object.values(dailyCounts),
+                        borderColor: '#1a73e8',
+                        tension: 0.1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+
+            // Priority Distribution Chart
+            const priorityCounts = {
+                'High': complaints.filter(c => c.aiAnalysis?.priority === 'High').length,
+                'Medium': complaints.filter(c => c.aiAnalysis?.priority === 'Medium').length,
+                'Low': complaints.filter(c => c.aiAnalysis?.priority === 'Low').length
+            };
+
+            window.priorityChart = new Chart(document.getElementById('priorityChart'), {
+                type: 'pie',
+                data: {
+                    labels: Object.keys(priorityCounts),
+                    datasets: [{
+                        data: Object.values(priorityCounts),
+                        backgroundColor: [
+                            '#ea4335', '#fbbc05', '#34a853'
+                        ]
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            position: 'bottom'
+                        }
+                    }
+                }
+            });
+        };
+
+        // Fetch Complaints
+        const fetchComplaints = async () => {
+            if (!db) {
+                showError('Database connection not available');
+                return;
+            }
+
+            tableSpinner.style.display = 'block';
+            complaintsBody.innerHTML = '';
+
+            try {
+                const querySnapshot = await db.collection('complaints').get();
+                complaintsData = [];
+                querySnapshot.forEach(doc => {
+                    complaintsData.push({ id: doc.id, ...doc.data() });
+                });
+                renderComplaints();
+                updateDashboard(complaintsData);
+            } catch (error) {
+                console.error('Error fetching complaints:', error);
+                showError('Failed to load complaints. Please try again.');
+                complaintsBody.innerHTML = '<tr><td colspan="7">No complaints found</td></tr>';
+            } finally {
+                tableSpinner.style.display = 'none';
+            }
+        };
+
+        // Render Complaints
+        const renderComplaints = () => {
+            const status = statusFilter.value;
+            let filteredData = status ? complaintsData.filter(c => c.status === status) : complaintsData;
+
+            filteredData.sort((a, b) => {
+                const values = [
+                    a.id, a.fullName, a.voterId, a.complaintType, a.status,
+                    a.submittedAt ? a.submittedAt.toDate() : new Date(0)
+                ].map(v => v || '');
+                const valueA = values[sortColumn];
+                const valueB = [b.id, b.fullName, b.voterId, b.complaintType, b.status,
+                    b.submittedAt ? b.submittedAt.toDate() : new Date(0)
+                ].map(v => v || '')[sortColumn];
+
+                if (sortColumn === 5) {
+                    return sortAsc ? valueA - valueB : valueB - valueA;
+                }
+                return sortAsc ? valueA.localeCompare(valueB) : valueB.localeCompare(valueA);
+            });
+
+            complaintsBody.innerHTML = '';
+            if (filteredData.length === 0) {
+                complaintsBody.innerHTML = '<tr><td colspan="7">No complaints found</td></tr>';
+                return;
+            }
+
+            filteredData.forEach(complaint => {
+                const row = document.createElement('tr');
+                const allowedStatuses = validTransitions[complaint.status || 'Received'] || [];
+                row.innerHTML = `
+                    <td>${complaint.id}</td>
+                    <td>${complaint.fullName || 'N/A'}</td>
+                    <td>${complaint.voterId || 'N/A'}</td>
+                    <td>${getComplaintTypeText(complaint.complaintType)}</td>
+                    <td><span class="status status-${complaint.status.toLowerCase().replace(' ', '-') || 'received'}">${complaint.status || 'Received'}</span></td>
+                    <td>${complaint.submittedAt ? formatDate(complaint.submittedAt.toDate()) : 'N/A'}</td>
+                    <td>
+                        ${allowedStatuses.length > 0 ? `
+                            <button class="action-btn update-btn" onclick="prepareAction('${complaint.id}')">Update Status</button>
+                        ` : ''}
+                    </td>
+                `;
+                row.addEventListener('click', (e) => {
+                    if (!e.target.classList.contains('action-btn')) {
+                        showComplaintDetails(complaint);
+                    }
+                });
+                complaintsBody.appendChild(row);
+            });
+        };
+
+        // Sort Table
+        const sortTable = (column) => {
+            if (sortColumn === column) {
+                sortAsc = !sortAsc;
+            } else {
+                sortColumn = column;
+                sortAsc = true;
+            }
+            renderComplaints();
+        };
+
+        // Show Complaint Details
+        const showComplaintDetails = (complaint, updateMode = false) => {
+            document.getElementById('modalComplaintId').textContent = complaint.id || 'N/A';
+            document.getElementById('modalFullName').textContent = complaint.fullName || 'N/A';
+            document.getElementById('modalVoterId').textContent = complaint.voterId || 'N/A';
+            document.getElementById('modalComplaintType').textContent = getComplaintTypeText(complaint.complaintType);
+            document.getElementById('modalStatus').textContent = complaint.status || 'Received';
+            document.getElementById('modalSubmittedAt').textContent = complaint.submittedAt ? formatDate(complaint.submittedAt.toDate()) : 'N/A';
+            document.getElementById('modalIncidentDate').textContent = complaint.incidentDate ? formatDate(complaint.incidentDate.toDate()) : 'N/A';
+            document.getElementById('modalLocation').textContent = complaint.location || 'N/A';
+            document.getElementById('modalDescription').textContent = complaint.description || 'N/A';
+            document.getElementById('modalContactInfo').textContent = complaint.contactInfo || 'N/A';
+            document.getElementById('modalFileUrl').innerHTML = complaint.fileUrl ? `<a href="${complaint.fileUrl}" target="_blank">View Evidence</a>` : 'No evidence uploaded';
+            document.getElementById('modalResolutionNote').textContent = complaint.resolutionNote || 'N/A';
+            document.getElementById('modalCancellationReason').textContent = complaint.cancellationReason || 'N/A';
+
+            if (updateMode) {
+                actionInput.style.display = 'block';
+                const allowedStatuses = validTransitions[complaint.status || 'Received'] || [];
+                actionStatus.innerHTML = '<option value="">Select Status</option>' + 
+                    allowedStatuses.map(status => `<option value="${status}">${status}</option>`).join('');
+                actionNoteInput.style.display = 'none';
+                modalActions.innerHTML = `
+                    <button onclick="submitAction('${complaint.id}')">Confirm</button>
+                    <button onclick="closeModal()">Cancel</button>
+                `;
+            } else {
+                actionInput.style.display = 'none';
+                actionNoteInput.style.display = 'none';
+                modalActions.innerHTML = '';
+            }
+            complaintModal.style.display = 'flex';
+        };
+
+        // Prepare Action (Update Status)
+        const prepareAction = (complaintId) => {
+            const complaint = complaintsData.find(c => c.id === complaintId);
+            showComplaintDetails(complaint, true);
+        };
+
+        // Submit Action (Update Status)
+        const submitAction = async (complaintId) => {
+            if (!db) {
+                showError('Database connection not available');
+                return;
+            }
+
+            const newStatus = actionStatus.value;
+            if (!newStatus) {
+                showError('Please select a status');
+                return;
+            }
+
+            const complaint = complaintsData.find(c => c.id === complaintId);
+            const currentStatus = complaint.status || 'Received';
+            if (!validTransitions[currentStatus].includes(newStatus)) {
+                showError(`Cannot change status from ${currentStatus} to ${newStatus}`);
+                return;
+            }
+
+            let note = actionNote.value.trim();
+            if ((newStatus === 'Resolved' || newStatus === 'Canceled') && !note) {
+                showError(`Please provide a ${newStatus === 'Resolved' ? 'resolution note' : 'cancellation reason'}`);
+                return;
+            }
+
+            try {
+                const docRef = db.collection('complaints').doc(complaintId);
+                const updateData = {
+                    status: newStatus
+                };
+                if (newStatus === 'Under Review') {
+                    updateData.reviewDate = new Date();
+                } else if (newStatus === 'Investigating') {
+                    updateData.investigateDate = new Date();
+                } else if (newStatus === 'Resolved') {
+                    updateData.resolutionNote = note;
+                    updateData.resolveDate = new Date();
+                } else if (newStatus === 'Canceled') {
+                    updateData.cancellationReason = note;
+                    updateData.cancelDate = new Date();
+                }
+                await docRef.update(updateData);
+                showSuccess(`Complaint status updated to ${newStatus} successfully`);
+                fetchComplaints();
+                closeModal();
+            } catch (error) {
+                console.error(`Error updating complaint status:`, error);
+                showError(`Failed to update complaint status. Please try again.`);
+            }
+        };
+
+        // Close Modal
+        const closeModal = () => {
+            complaintModal.style.display = 'none';
+            actionInput.style.display = 'none';
+            actionNoteInput.style.display = 'none';
+            modalActions.innerHTML = '';
+        };
+
+        // Event Listeners
+        statusFilter.addEventListener('change', renderComplaints);
+        refreshBtn.addEventListener('click', fetchComplaints);
+        window.addEventListener('click', (e) => {
+            if (e.target === complaintModal) closeModal();
+        });
+        actionStatus.addEventListener('change', () => {
+            const status = actionStatus.value;
+            actionNoteInput.style.display = (status === 'Resolved' || status === 'Canceled') ? 'block' : 'none';
+            actionLabel.textContent = status === 'Resolved' ? 'Resolution Note:' : status === 'Canceled' ? 'Cancellation Reason:' : '';
+            actionNote.value = '';
+        });
+
+        // Initial Fetch
+        fetchComplaints();
+
+        // Add this function to generate test data
+        const generateTestData = async () => {
+            if (!db) {
+                showError('Database connection not available');
+                return;
+            }
+
+            const testComplaints = [
+                {
+                    fullName: "John Doe",
+                    voterId: "VOTER123",
+                    complaintType: "vote-tampering",
+                    status: "Resolved",
+                    description: "Suspicious activity at booth 5",
+                    submittedAt: new Date(2024, 2, 1),
+                    resolveDate: new Date(2024, 2, 3),
+                    aiAnalysis: {
+                        priority: "High",
+                        riskLevel: "Critical",
+                        confidence: "High",
+                        category: "vote-tampering"
+                    }
+                },
+                {
+                    fullName: "Jane Smith",
+                    voterId: "VOTER456",
+                    complaintType: "missing-from-list",
+                    status: "Under Review",
+                    description: "Name not found in voter list",
+                    submittedAt: new Date(2024, 2, 2),
+                    aiAnalysis: {
+                        priority: "Medium",
+                        riskLevel: "Moderate",
+                        confidence: "Medium",
+                        category: "registration"
+                    }
+                },
+                {
+                    fullName: "Robert Johnson",
+                    voterId: "VOTER789",
+                    complaintType: "denied-voting",
+                    status: "Investigating",
+                    description: "Denied voting due to ID issues",
+                    submittedAt: new Date(2024, 2, 3),
+                    aiAnalysis: {
+                        priority: "High",
+                        riskLevel: "High",
+                        confidence: "High",
+                        category: "verification"
+                    }
+                },
+                {
+                    fullName: "Sarah Williams",
+                    voterId: "VOTER101",
+                    complaintType: "vote-tampering",
+                    status: "Received",
+                    description: "Multiple votes from same booth",
+                    submittedAt: new Date(2024, 2, 4),
+                    aiAnalysis: {
+                        priority: "High",
+                        riskLevel: "Critical",
+                        confidence: "High",
+                        category: "vote-tampering"
+                    }
+                },
+                {
+                    fullName: "Michael Brown",
+                    voterId: "VOTER202",
+                    complaintType: "staff-bias",
+                    status: "Resolved",
+                    description: "Polling staff showing bias",
+                    submittedAt: new Date(2024, 2, 5),
+                    resolveDate: new Date(2024, 2, 7),
+                    aiAnalysis: {
+                        priority: "Medium",
+                        riskLevel: "Moderate",
+                        confidence: "Medium",
+                        category: "staff-conduct"
+                    }
+                },
+                {
+                    fullName: "Emily Davis",
+                    voterId: "VOTER303",
+                    complaintType: "vote-tampering",
+                    status: "Canceled",
+                    description: "Suspected vote manipulation",
+                    submittedAt: new Date(2024, 2, 6),
+                    cancellationReason: "Duplicate complaint",
+                    aiAnalysis: {
+                        priority: "High",
+                        riskLevel: "Critical",
+                        confidence: "High",
+                        category: "vote-tampering"
+                    }
+                },
+                {
+                    fullName: "David Wilson",
+                    voterId: "VOTER404",
+                    complaintType: "long-wait",
+                    status: "Resolved",
+                    description: "Excessive waiting time",
+                    submittedAt: new Date(2024, 2, 7),
+                    resolveDate: new Date(2024, 2, 8),
+                    aiAnalysis: {
+                        priority: "Low",
+                        riskLevel: "Low",
+                        confidence: "High",
+                        category: "logistics"
+                    }
+                }
+            ];
+
+            try {
+                for (const complaint of testComplaints) {
+                    await db.collection('complaints').add(complaint);
+                }
+                showSuccess('Test data generated successfully!');
+                fetchComplaints(); // Refresh the dashboard
+            } catch (error) {
+                console.error('Error generating test data:', error);
+                showError('Failed to generate test data');
+            }
+        };
+
+        // Add a button to generate test data
+        const addTestDataButton = document.createElement('button');
+        addTestDataButton.textContent = 'Generate Test Data';
+        addTestDataButton.onclick = generateTestData;
+        addTestDataButton.style.marginBottom = '20px';
+        document.querySelector('.dashboard-container').insertBefore(addTestDataButton, document.querySelector('.dashboard-grid'));
+    </script>
+</body>
+</html>
